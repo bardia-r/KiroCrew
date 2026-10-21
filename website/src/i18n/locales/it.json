@@ -6374,7 +6374,9 @@
       "move_panel_to_bottom": "Sposta pannello in basso",
       "more_actions": "Altre azioni",
       "close_failed": "Impossibile arrestare la shell di questo terminale sul server. Verrà ripulita automaticamente.",
-      "closing_terminal": "Chiusura del terminale…"
+      "closing_terminal": "Chiusura del terminale…",
+      "fullscreen": "Schermo intero",
+      "exit_fullscreen": "Esci da schermo intero"
     },
     "tabCloseMenu": {
       "close_all_terminals": "Chiudi tutti i terminali",
@@ -10363,6 +10365,16 @@
       "title": "Troppo grande per essere analizzato",
       "body": "{{name}} pesa {{size}}. I file oltre {{limit}} non vengono controllati alla ricerca di segreti prima del download.",
       "download_anyway": "Scarica comunque"
+    },
+    "terminalFindBar": {
+      "find": "Trova",
+      "search_scrollback": "Cerca nella cronologia del terminale",
+      "no_results": "Nessun risultato",
+      "match_count": "{{index}} di {{total}}",
+      "match_overflow": "{{total}} corrispondenze",
+      "previous_match": "Corrispondenza precedente",
+      "next_match": "Corrispondenza successiva",
+      "close_search": "Chiudi ricerca"
     }
   },
   "hooks": {

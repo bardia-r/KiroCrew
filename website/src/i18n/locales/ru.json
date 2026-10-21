@@ -6483,7 +6483,9 @@
       "move_panel_to_bottom": "Переместить панель вниз",
       "more_actions": "Другие действия",
       "close_failed": "Не удалось остановить оболочку этого терминала на сервере. Она будет очищена автоматически.",
-      "closing_terminal": "Закрытие терминала…"
+      "closing_terminal": "Закрытие терминала…",
+      "fullscreen": "Полный экран",
+      "exit_fullscreen": "Выйти из полноэкранного режима"
     },
     "tabCloseMenu": {
       "close_all_terminals": "Закрыть все терминалы",
@@ -10508,6 +10510,16 @@
       "title": "Слишком большой для проверки",
       "body": "Размер {{name}} — {{size}}. Файлы больше {{limit}} не проверяются на секреты перед загрузкой.",
       "download_anyway": "Всё равно скачать"
+    },
+    "terminalFindBar": {
+      "find": "Найти",
+      "search_scrollback": "Поиск в буфере прокрутки терминала",
+      "no_results": "Нет результатов",
+      "match_count": "{{index}} из {{total}}",
+      "match_overflow": "{{total}} совпадений",
+      "previous_match": "Предыдущее совпадение",
+      "next_match": "Следующее совпадение",
+      "close_search": "Закрыть поиск"
     }
   },
   "hooks": {

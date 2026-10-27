@@ -121,7 +121,7 @@ export default function CrewChatWindow({ target, onClose = closeCrewWindow }: { 
   // detail carries the transcript. Both are the peer's own answers.
   const slotQ = useQuery({
     queryKey: slotKeyQ,
-    queryFn: async () => ((await api.crewPeerGet(instanceId, 'api/chat/slots')) as PeerSlot[]).find(s => s.key === key) ?? null,
+    queryFn: async () => ((await api.crewPeerGet(instanceId, 'api/chat/slots?crew=all')) as PeerSlot[]).find(s => s.key === key) ?? null,
     enabled: versionOk,
   })
   const detailQ = useQuery({

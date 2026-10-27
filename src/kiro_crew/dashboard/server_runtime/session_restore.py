@@ -70,6 +70,14 @@ async def _restore_dashboard_sessions(state: DashboardState, cfg: KiroCrewConfig
             # re-mint a colliding low index (which scrambles the tab -> session map).
             state.reseed_slot_counter()
 
+        from kiro_crew.dashboard import crew_mode_migration
+
+        _closed_roots_seed = asyncio.create_task(
+            crew_mode_migration.seed_closed_roots_in_background(state)
+        )
+        state._background_tasks.add(_closed_roots_seed)
+        _closed_roots_seed.add_done_callback(state._background_tasks.discard)
+
         if state._dynamic_cards is not None:
             state._dynamic_cards.seed_open_sessions()
 

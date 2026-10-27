@@ -545,8 +545,10 @@ def _isolated_backup_state(tmp_path, monkeypatch):
     # behaviour lives in test_aws_control_backup_retention.py.
     monkeypatch.setattr(backup.storage, "list_object_versions", lambda *a, **k: [])
     backup.clear_stop()
+    hooks._task = None
     yield
     backup.clear_stop()
+    hooks._task = None
 
 
 def _resolvable():

@@ -508,6 +508,77 @@ def _k15_parked_pool_wait(module: _Module) -> Iterable[ast.AST]:
             yield node
 
 
+def _kiro_crew_module_names(module: _Module) -> frozenset[str]:
+    """Lowercase names imported from ``kiro_crew.*`` at module scope.
+
+    A kiro_crew module import binds a persistent module object: assigning a live
+    asyncio Task or TimerHandle to one of its attributes creates state that survives
+    the test's event loop and can block or corrupt the next test on the same worker.
+    """
+    names: set[str] = set()
+    for node in module.tree.body:
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module == "kiro_crew" or node.module.startswith("kiro_crew."):
+                for alias in node.names:
+                    name = alias.asname or alias.name
+                    if name and name[0].islower():
+                        names.add(name)
+    return frozenset(names)
+
+
+def _is_task_creating_value(node: ast.AST) -> bool:
+    """True when *node* is a call that produces an asyncio Task or TimerHandle."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Attribute):
+        attr = func.attr
+    elif isinstance(func, ast.Name):
+        attr = func.id
+    else:
+        return False
+    return attr in ("create_task", "ensure_future", "call_later", "call_at")
+
+
+def _k16_module_async_state(module: _Module) -> Iterable[ast.AST]:
+    """In a test function (not an autouse fixture), assigns a Task or TimerHandle to
+    an attribute of an imported ``kiro_crew`` module.
+
+    The module object outlives the test's event loop; a stale Task or TimerHandle
+    stored in it causes the next test on the same xdist worker to hang (asyncio.gather
+    on a done task from a closed loop never resolves) or read half-initialised state.
+    Fix: add an ``autouse=True`` fixture that clears the attribute before and after
+    each test, following the pattern in ``test_crewmate_feed._isolated``.
+    """
+    kc_mods = _kiro_crew_module_names(module)
+    if not kc_mods:
+        return
+    autouse_fns: set[str] = set()
+    for node in ast.walk(module.tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for dec in node.decorator_list:
+            dec_text = ast.unparse(dec)
+            if "autouse" in dec_text and "True" in dec_text:
+                autouse_fns.add(node.name)
+    for write in module.writes:
+        if not isinstance(write, ast.Assign):
+            continue
+        if not _is_task_creating_value(write.value):
+            continue
+        for target in write.targets:
+            if not (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id in kc_mods
+            ):
+                continue
+            fn = module.enclosing_function(write)
+            if fn is None or getattr(fn, "name", None) in autouse_fns:
+                continue
+            yield write
+
+
 def _parenthesized_with_as(source: bytes, starts: list[int], node: ast.AST) -> bool:
     """Whether *node* is ``with (a as b, ...):``: one pair of parentheses holds every
     item and at least one binds a name. ``with (a) as b:`` and ``with (a, b):`` are not."""
@@ -583,6 +654,7 @@ PY_TRIGGERS: dict[str, tuple[str, ...]] = {
     "K13-fixed-flush-ceiling": ("flush",),
     "K14-unpaused-crew-log-rmtree": ("rmtree",),
     "K15-parked-pool-wait": ("to_thread", "run_in_executor"),
+    "K16-module-async-state": ("create_task", "call_later", "ensure_future"),
 }
 
 #: The classes whose detector also reads the source text.
@@ -599,6 +671,7 @@ PY_DETECTORS: dict[str, Callable[..., Iterable[ast.AST]]] = {
     "K13-fixed-flush-ceiling": _k13_fixed_flush_ceiling,
     "K14-unpaused-crew-log-rmtree": _k14_unpaused_crew_log_rmtree,
     "K15-parked-pool-wait": _k15_parked_pool_wait,
+    "K16-module-async-state": _k16_module_async_state,
 }
 
 
@@ -1036,6 +1109,29 @@ PY_CASES: dict[str, tuple[tuple[str, ...], str]] = {
         "    await asyncio.to_thread(work, 5)\n    await asyncio.to_thread(ev.is_set)\n"
         "    await loop.run_in_executor(None, work, 5)\n"
         "    await async_wait_until(ev.is_set)\ndef held():\n    assert ev.wait(5)\n",
+    ),
+    "K16-module-async-state": (
+        (
+            # create_task assigned to a kiro_crew module attribute in a test function
+            "import asyncio\nfrom kiro_crew.apps.builtins.aws_control import hooks\n"
+            "async def test_x():\n    hooks._task = asyncio.create_task(f())\n",
+            # call_later via get_running_loop()
+            "import asyncio\nfrom kiro_crew.dashboard import crewmate_feed\n"
+            "async def test_y():\n"
+            "    crewmate_feed._timer = asyncio.get_running_loop().call_later(0.4, lambda: None)\n",
+        ),
+        # Near misses: local variable (not a kiro_crew import), None assignment,
+        # uppercase import (class, not module), and autouse fixture body.
+        "import asyncio\nimport pytest\nfrom kiro_crew.apps.builtins.aws_control import hooks\n"
+        "from kiro_crew.dashboard.state import DashboardState\n"
+        "@pytest.fixture(autouse=True)\n"
+        "def _isolated():\n    hooks._task = asyncio.create_task(f())\n    yield\n"
+        "    hooks._task = None\n"  # autouse fixture body is exempt
+        "async def test_x():\n"
+        "    client._task = asyncio.create_task(g())\n"  # 'client' not in kiro_crew imports
+        "    state = DashboardState()\n"
+        "    state._task = asyncio.create_task(h())\n"  # 'state' is local, not module
+        "    hooks._timer = None\n",  # None is not a task
     ),
 }
 

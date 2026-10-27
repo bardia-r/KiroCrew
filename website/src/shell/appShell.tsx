@@ -40,6 +40,7 @@ import { useTopbarCollapse } from '../lib/useTopbarCollapse'
 import { subscribeNativeNavigate, useMacFullscreen } from './platform/electronBridge'
 import { useNativeHistoryStep } from './platform/nativeHistoryStep'
 import AppIcon from '../components/AppIcon'
+import AppNavStateIcon from './nav/AppNavStateIcon'
 import { useUpdateFlow } from './updates/updateFlow'
 import { useUpdateSubscription, usePolicyGovernedNotification } from '../hooks/useUpdateSubscription'
 import { useBottomTerminalOpen, useTerminalPosition } from '../hooks/useBottomTerminal'
@@ -587,10 +588,16 @@ export function useAppShell() {
                 : builtinIcon
                   ? builtinIcon
                   : <Package size={16} />
+            // An app that declares `ui.pages[].iconInactiveUrl` gets that file on
+            // its row while the row is not selected, the way built-in icons go
+            // grey (see AppNavStateIcon).
+            const stateIcon = target.inactiveIconUrl
+              ? <AppNavStateIcon icon={baseIcon} inactiveSrc={target.inactiveIconUrl} />
+              : baseIcon
             // Orphaned apps get a warn-colored icon to signal migration needed
             const icon = target.orphaned
-              ? <span className="text-warn">{baseIcon}</span>
-              : baseIcon
+              ? <span className="text-warn">{stateIcon}</span>
+              : stateIcon
             return [{
               path: target.route,
               id: target.id,

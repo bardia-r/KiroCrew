@@ -27,6 +27,7 @@ and its foreign-line fold are pinned in
 from __future__ import annotations
 
 import asyncio
+import gc
 import multiprocessing
 import os
 import threading
@@ -214,6 +215,25 @@ class TestCrossProcessLock:
         contents = {m["content"] for m in fresh._read_messages("k")}
         missing = [f"a-{i}" for i in range(n) if f"a-{i}" not in contents]
         assert not missing, f"cross-process rewrite lost {len(missing)} appends"
+
+
+class TestFileLocksEviction:
+    """``_file_locks`` is a ``WeakValueDictionary`` so a deleted session's
+    entry evicts once nothing holds its lock, instead of leaking one RLock
+    per distinct session for the gateway's whole life (#24855).
+    """
+
+    def test_file_locks_do_not_leak_across_many_deleted_sessions(self, tmp_path: Path) -> None:
+        log = ConversationLog(base_dir=tmp_path)
+        baseline = len(ConversationLog._file_locks)
+
+        for i in range(1000):
+            key = f"session-{i}"
+            log.append(key, "user", "seed")
+            assert log.delete_session(key)
+
+        gc.collect()
+        assert len(ConversationLog._file_locks) == baseline
 
 
 class TestMessageCacheRewriteSerialization:

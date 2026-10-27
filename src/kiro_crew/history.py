@@ -23,6 +23,7 @@ import sys as _sys
 import threading
 import time as _time  # noqa: F401 - facade re-export
 import uuid  # noqa: F401 - facade re-export
+import weakref
 from collections.abc import (  # noqa: F401 - facade re-export
     Callable,
     Container,
@@ -315,7 +316,12 @@ class ConversationLog:
     # Per-file reentrant locks shared across every instance in this process so
     # transcript mutations (append / rewrite / metadata edit) targeting the
     # same session file are serialized and never lose each other's writes.
-    _file_locks: dict[str, threading.RLock] = {}
+    # A WeakValueDictionary so a deleted session's entry evicts once nothing
+    # holds its lock: every caller of ``_file_lock`` keeps a strong reference
+    # to the returned lock for its whole critical section, so a concurrent
+    # writer to the same path still gets the same object, and an entry can
+    # only be collected while no writer holds it.
+    _file_locks: weakref.WeakValueDictionary[str, threading.RLock] = weakref.WeakValueDictionary()
     _file_locks_guard = threading.Lock()
 
     # Cross-process advisory-lock state. The per-file ``threading.RLock`` above
@@ -385,9 +391,11 @@ class ConversationLog:
     # never the reverse, and never across I/O — so no read path waits on a
     # writer's file operations. Grows one small int per (dir, spelling) ever
     # invalidated in this process — a session can occupy up to two buckets
-    # (a legacy bare Slack stem plus its canonical spelling) — the same
-    # growth class as ``_file_locks``, and entries are never evicted because
-    # a missing entry must always mean "generation 0", not "forgotten bump".
+    # (a legacy bare Slack stem plus its canonical spelling). Unlike
+    # ``_file_locks`` (a ``WeakValueDictionary`` that evicts once nothing holds
+    # the lock), this dict is deliberately unbounded: entries are never
+    # evicted because a missing entry must always mean "generation 0", not
+    # "forgotten bump".
     _cache_gens: dict[tuple[str, str], int] = {}
     _cache_gens_guard = threading.Lock()
     #: Per transcript directory, the total of every bump above: one int per

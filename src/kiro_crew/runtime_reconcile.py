@@ -1125,8 +1125,10 @@ class RuntimeReconciler:
                     # slice and in no record, but it is not an agent runtime, so it
                     # leaves the population HERE rather than at a later condition:
                     # excluded before the list is built it is never counted in
-                    # ``unowned_alive``, never reaches ``_why_not_yet``, and never
-                    # collects a gate allow or a kill attribution naming it.
+                    # ``unowned_alive`` and never reaches ``_why_not_yet``, so it
+                    # writes none of the withheld-reason audit rows ``hold`` records.
+                    # It never reached the gate either way: ``_why_not_yet`` withholds
+                    # a non-harness pid before ``_authorize`` is asked.
                     #
                     # BOTH tests, because the marker describes a TREE and the argv
                     # test is per process. A harness can carry the marker two ways:
